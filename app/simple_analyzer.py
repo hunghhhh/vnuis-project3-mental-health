@@ -1,17 +1,30 @@
 import pandas as pd
+import joblib
+import os
 
-# --- CÁC THAM SỐ CÓ THỂ THAY ĐỔI ---
+# --- ĐƯỜNG DẪN TỚI CÁC FILE ---
 DATA_FILE_PATH = 'data/posts.csv'
-NEGATIVE_KEYWORDS = ['stress', 'buồn', 'cô đơn', 'chán nản', 'khó']
-RISK_THRESHOLD = 2 # Nếu sinh viên có từ 2 bài đăng tiêu cực trở lên -> cảnh báo
+MODEL_PATH = 'app/models/sentiment_model.pkl'
+VECTORIZER_PATH = 'app/models/vectorizer.pkl'
 
-def analyze_student_sentiments():
+RISK_THRESHOLD = 2 # Ngưỡng cảnh báo: 2 bài đăng tiêu cực trở lên
+
+def analyze_student_sentiments_with_ai():
     """
-    Đọc dữ liệu bài đăng và phân tích cảm xúc dựa trên từ khóa đơn giản.
-    Trả về một danh sách các sinh viên có dấu hiệu rủi ro.
+    Phân tích cảm xúc bài đăng bằng mô hình AI đã được huấn luyện.
     """
-    print("Bắt đầu phân tích dữ liệu...")
-    
+    print("Bắt đầu phân tích dữ liệu bằng mô hình AI...")
+
+    # 1. Tải mô hình và vectorizer đã lưu
+    try:
+        model = joblib.load(MODEL_PATH)
+        vectorizer = joblib.load(VECTORIZER_PATH)
+    except FileNotFoundError:
+        print("Lỗi: Không tìm thấy file mô hình AI.")
+        print("Vui lòng chạy script 'scripts/train_model.py' trước để huấn luyện mô hình.")
+        return
+
+    # 2. Tải dữ liệu bài đăng mô phỏng
     try:
         posts_df = pd.read_csv(DATA_FILE_PATH)
     except FileNotFoundError:
@@ -19,43 +32,43 @@ def analyze_student_sentiments():
         print("Vui lòng chạy script 'scripts/data_simulator.py' trước.")
         return
 
-    # Đếm số bài đăng tiêu cực cho mỗi sinh viên
-    risky_students = {} # Dùng dictionary để lưu {student_id: count}
-
-    for index, row in posts_df.iterrows():
-        student_id = row['student_id']
-        content = str(row['content']).lower() # Chuyển về chữ thường để dễ so sánh
-        
-        # Kiểm tra xem nội dung có chứa từ khóa tiêu cực không
-        has_negative_keyword = any(keyword in content for keyword in NEGATIVE_KEYWORDS)
-        
-        if has_negative_keyword:
-            # Nếu có, tăng bộ đếm cho sinh viên đó
-            risky_students[student_id] = risky_students.get(student_id, 0) + 1
+    # 3. Sử dụng mô hình để dự đoán cảm xúc cho từng bài đăng
+    # Tiền xử lý và vector hóa nội dung bài đăng
+    # Lưu ý: Dữ liệu huấn luyện là tiếng Anh, nhưng logic áp dụng là như nhau.
+    # Trong đồ án, ta giả định mô hình đã được huấn luyện với dữ liệu tiếng Việt tương tự.
+    post_contents = posts_df['content'].astype(str)
+    post_vectors = vectorizer.transform(post_contents)
     
-    print("Phân tích hoàn tất. Lọc ra các sinh viên có nguy cơ...")
+    # Dự đoán (0 = tiêu cực, 1 = tích cực)
+    predictions = model.predict(post_vectors)
+    posts_df['sentiment_label'] = predictions
+    
+    print("Đã dự đoán xong cảm xúc cho tất cả bài đăng.")
 
-    # Lọc ra những sinh viên vượt ngưỡng cảnh báo
+    # 4. Lọc và đếm các bài đăng tiêu cực (label = 0)
+    negative_posts_df = posts_df[posts_df['sentiment_label'] == 0]
+    risky_student_counts = negative_posts_df['student_id'].value_counts()
+    
+    # 5. Lọc ra các sinh viên vượt ngưỡng cảnh báo
     students_to_alert = []
-    for student_id, count in risky_students.items():
+    for student_id, count in risky_student_counts.items():
         if count >= RISK_THRESHOLD:
             students_to_alert.append({
-                'student_id': student_id,
-                'negative_post_count': count
+                'student_id': int(student_id),
+                'negative_post_count': int(count)
             })
 
     return students_to_alert
 
 # --- Chạy chương trình chính ---
 if __name__ == "__main__":
-    alerts = analyze_student_sentiments()
+    alerts = analyze_student_sentiments_with_ai()
     
     if alerts is not None:
         if not alerts:
-            print("\nKhông phát hiện sinh viên nào có dấu hiệu rủi ro.")
+            print("\nKhông phát hiện sinh viên nào có dấu hiệu rủi ro theo mô hình AI.")
         else:
-            print(f"\n[CẢNH BÁO] Phát hiện {len(alerts)} sinh viên có dấu hiệu cần quan tâm:")
-            # Sắp xếp danh sách để dễ nhìn
+            print(f"\n[CẢNH BÁO] Mô hình AI phát hiện {len(alerts)} sinh viên có dấu hiệu cần quan tâm:")
             sorted_alerts = sorted(alerts, key=lambda x: x['negative_post_count'], reverse=True)
             for alert in sorted_alerts:
                 print(f" - Sinh viên ID: {alert['student_id']}, Số bài đăng tiêu cực: {alert['negative_post_count']}")
