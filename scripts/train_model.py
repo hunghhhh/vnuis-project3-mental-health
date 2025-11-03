@@ -28,8 +28,10 @@ print(f"Đã tải {len(df)} câu mẫu để huấn luyện.")
 stop_words = set(stopwords.words('english'))
 
 def preprocess_text(text):
+    # === SỬA LỖI: Đảm bảo đầu vào luôn là string ===
+    safe_text = str(text) 
     # Chuyển thành chữ thường và loại bỏ stopwords
-    words = text.lower().split()
+    words = safe_text.lower().split()
     filtered_words = [word for word in words if word not in stop_words]
     return " ".join(filtered_words)
 
