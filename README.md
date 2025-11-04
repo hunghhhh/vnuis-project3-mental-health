@@ -1,40 +1,55 @@
-# Đồ án 3: Hệ thống AI & BigData Cảnh báo Sức khỏe Tâm lý Sinh viên
+# Project 3: AI & Big Data System for Student Mental Health Warning
 
+This is the final product for Project 3, specializing in Cyber Security & IoT, at VNU-International School.
 
-**Sinh viên thực hiện:** Nguyễn Duy Hùng
+**Student:** Nguyễn Duy Hùng
+**ID:** 22071098
 
-## Mô tả dự án
+## Project Overview
 
-Hệ thống xây dựng một dashboard tương tác để phân tích và cảnh báo sớm các dấu hiệu về sức khỏe tâm lý của sinh viên. Dự án sử dụng hai nguồn dữ liệu chính:
-1.  **Dữ liệu khảo sát thực tế** từ Kaggle để phân tích các yếu tố nhân khẩu học.
-2.  **Dữ liệu hành vi mô phỏng** (lượt đăng nhập, bài đăng) để phân tích các mẫu hình bất thường theo thời gian bằng AI.
+This project develops an interactive dashboard designed to analyze and provide early warnings for student mental health issues. The system leverages data analysis and AI to identify potential risk factors and behavioral patterns.
 
-## Hướng dẫn Cài đặt và Chạy dự án
+The dashboard presents a comprehensive narrative through three analytical sections:
+1.  **Evidence from Real-world Survey Data:** Utilizes a public dataset from Kaggle to establish a correlation between academic performance (GPA) and mental health status.
+2.  **In-depth Analysis of Risk Factors:** Employs a custom-simulated dataset to explore underlying risk factors, such as academic load and social support.
+3.  **Behavioral Monitoring & AI-powered Alerts:** Demonstrates a proof-of-concept AI system that analyzes simulated text data for sentiment and monitors behavioral patterns (e.g., late-night activity) to flag at-risk individuals.
 
-### Yêu cầu
+## Installation and Usage Guide
+
+### Prerequisites
 - Python 3.8+
 - Git
 
-### Các bước cài đặt
-1.  Clone repository về máy:
+### Setup Steps
+1.  **Clone the repository:**
     ```bash
     git clone https://github.com/hunghhhh/vnuis-project3-mental-health.git
     cd vnuis-project3-mental-health
     ```
-2.  Tạo và kích hoạt môi trường ảo:
+2.  **Create and activate a virtual environment:**
     ```bash
     python -m venv venv
     source venv/Scripts/activate
     ```
-3.  Cài đặt các thư viện cần thiết:
+3.  **Install the required libraries:**
     ```bash
     pip install -r requirements.txt
     ```
-4.  Huấn luyện mô hình AI (chỉ cần chạy lần đầu):
+4.  **Generate the necessary datasets:**
+    *   First, run the behavioral data simulator:
+        ```bash
+        python scripts/data_simulator.py
+        ```
+    *   Then, create the student profiles:
+        ```bash
+        python scripts/create_profiles.py
+        ```
+5.  **Train the AI model (only needs to be run once):**
     ```bash
     python scripts/train_model.py
     ```
-5.  Chạy dashboard:
+6.  **Run the Streamlit dashboard:**
     ```bash
     streamlit run app/dashboard.py
     ```
+    The application will open in your web browser.

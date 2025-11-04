@@ -2,84 +2,130 @@ import streamlit as st
 import pandas as pd
 from simple_analyzer import analyze_student_sentiments_with_ai
 import plotly.express as px
+import datetime
 
-st.set_page_config(page_title="Dashboard Sức khỏe Tâm lý SV", page_icon="🧠", layout="wide")
-st.title("🧠 Dashboard Phân tích Sức khỏe Tâm lý Sinh viên")
+st.set_page_config(page_title="Student Mental Health Dashboard", page_icon="🧠", layout="wide")
+st.title("🧠 Dashboard Phân tích & Cảnh báo Sức khỏe Tâm lý Sinh viên")
+st.markdown("Một dự án kết hợp phân tích dữ liệu và AI để phát hiện sớm các dấu hiệu rủi ro về sức khỏe tâm lý.")
 
 @st.cache_data
-def load_kaggle_data():
+def load_all_data():
     try:
-        df = pd.read_csv('data/Student Mental health.csv')
-        return df
-    except FileNotFoundError:
-        return None
+        kaggle_df = pd.read_csv('data/Student Mental health.csv')
+        profiles_df = pd.read_csv('data/student_profiles.csv')
+        posts_df = pd.read_csv('data/posts.csv')
+        logins_df = pd.read_csv('data/logins.csv')
+        return kaggle_df, profiles_df, posts_df, logins_df
+    except Exception as e:
+        st.error(f"Lỗi tải dữ liệu. Hãy chắc chắn bạn đã tạo đủ các file CSV. Chi tiết: {e}")
+        return None, None, None, None
 
 @st.cache_data
 def get_simulation_alerts():
-    results = analyze_student_sentiments_with_ai()
-    return results if results else []
+    try:
+        results = analyze_student_sentiments_with_ai()
+        return results if results else []
+    except Exception as e:
+        st.error(f"Lỗi khi chạy hệ thống AI: {e}")
+        return []
 
-kaggle_df = load_kaggle_data()
-simulation_alerts = get_simulation_alerts()
+kaggle_df_original, profiles_df, posts_df, logins_df = load_all_data()
 
-tab1, tab2 = st.tabs(["🔬 Phân tích Khảo sát (Kaggle)", "🤖 Hệ thống AI Mô phỏng"])
+st.sidebar.header("Bộ lọc Dữ liệu Khảo sát")
 
-with tab1:
-    st.header("Phân tích Dữ liệu Khảo sát Sức khỏe Tâm lý Sinh viên")
+if kaggle_df_original is not None:
+    course_list = ['Tất cả'] + sorted(list(kaggle_df_original['What is your course?'].unique()))
+    gender_list = ['Tất cả'] + sorted(list(kaggle_df_original['Choose your gender'].unique()))
+    age_list = ['Tất cả'] + sorted(list(kaggle_df_original['Age'].astype(str).unique()))
+
+    selected_course = st.sidebar.selectbox('Chọn Ngành học:', course_list)
+    selected_gender = st.sidebar.selectbox('Chọn Giới tính:', gender_list)
+    selected_age = st.sidebar.selectbox('Chọn Tuổi:', age_list)
+
+    kaggle_df_filtered = kaggle_df_original.copy()
+    if selected_course != 'Tất cả':
+        kaggle_df_filtered = kaggle_df_filtered[kaggle_df_filtered['What is your course?'] == selected_course]
+    if selected_gender != 'Tất cả':
+        kaggle_df_filtered = kaggle_df_filtered[kaggle_df_filtered['Choose your gender'] == selected_gender]
+    if selected_age != 'Tất cả':
+        kaggle_df_filtered = kaggle_df_filtered[kaggle_df_filtered['Age'].astype(str) == selected_age]
+else:
+    kaggle_df_filtered = None
+
+if kaggle_df_filtered is not None and profiles_df is not None and posts_df is not None and logins_df is not None:
     
-    if kaggle_df is not None:
-        st.markdown("Phân tích bộ dữ liệu 'Mental Health in University Students' từ Kaggle.")
-        
-        if st.checkbox("Hiển thị dữ liệu thô (Kaggle)"):
-            st.dataframe(kaggle_df)
+    st.header("Phần 1: Bằng chứng từ Dữ liệu Khảo sát Thực tế (Kaggle)")
+    st.markdown(f"Đang hiển thị dữ liệu cho: **{selected_course}** | **{selected_gender}** | **Tuổi: {selected_age}**")
 
-        st.subheader("Trực quan hóa Phân bổ Dữ liệu")
-        col1, col2 = st.columns(2)
-        with col1:
-            # === SỬA LỖI 1: Cập nhật tên cột chính xác ===
-            fig_depression = px.histogram(kaggle_df, x='Do you have Depression?', title="Phân bổ Tình trạng Trầm cảm")
-            st.plotly_chart(fig_depression, use_container_width=True)
-        with col2:
-            # === SỬA LỖI 2: Cập nhật tên cột chính xác ===
-            fig_anxiety = px.histogram(kaggle_df, x='Do you have Anxiety?', title="Phân bổ Tình trạng Lo âu")
-            st.plotly_chart(fig_anxiety, use_container_width=True)
+    with st.expander("Xem Dữ liệu Khảo sát đã lọc"):
+        st.dataframe(kaggle_df_filtered)
 
-        st.subheader("Mối tương quan giữa Điểm GPA và Sức khỏe Tâm lý")
-        # === SỬA LỖI 3: Cập nhật tên cột chính xác ===
-        # Dọn dẹp dữ liệu GPA
-        # Chuyển đổi cột GPA từ dạng string "3.00 - 3.49" thành số trung bình (3.245)
-        def convert_gpa(gpa_range):
-            try:
-                low, high = map(float, gpa_range.split(' - '))
-                return (low + high) / 2
-            except:
-                return None # Bỏ qua các giá trị không hợp lệ
-        
-        # Tạo bản sao để tránh lỗi SettingWithCopyWarning
-        kaggle_df_cleaned = kaggle_df.copy()
-        kaggle_df_cleaned['GPA_Value'] = kaggle_df_cleaned['What is your CGPA?'].apply(convert_gpa)
-        kaggle_df_cleaned.dropna(subset=['GPA_Value'], inplace=True) # Xóa các dòng có GPA không hợp lệ
-
-        fig_corr = px.box(kaggle_df_cleaned, x='Do you have Depression?', y='GPA_Value', 
-                              title="Phân bổ Điểm GPA theo Tình trạng Trầm cảm")
-        st.plotly_chart(fig_corr, use_container_width=True)
-        st.info("Nhận xét: Biểu đồ hộp cho thấy rằng sinh viên có báo cáo bị trầm cảm ('Yes') có xu hướng có điểm GPA trung bình thấp hơn so với nhóm còn lại ('No').")
-        
+    def convert_gpa(gpa_range):
+        try:
+            low, high = map(float, gpa_range.split(' - '))
+            return (low + high) / 2
+        except: return None
+    
+    kaggle_df_filtered['GPA_Value'] = kaggle_df_filtered['What is your CGPA?'].apply(convert_gpa)
+    kaggle_df_filtered.dropna(subset=['GPA_Value'], inplace=True)
+    
+    if not kaggle_df_filtered.empty:
+        avg_gpa_by_depression = kaggle_df_filtered.groupby('Do you have Depression?')['GPA_Value'].mean().reset_index()
+        fig_corr_kaggle = px.bar(
+            avg_gpa_by_depression, 
+            x='Do you have Depression?', y='GPA_Value', 
+            title="So sánh Điểm GPA Trung bình theo Tình trạng Trầm cảm",
+            labels={"Do you have Depression?": "Tình trạng Trầm cảm", "GPA_Value": "Điểm GPA Trung bình"},
+            color='Do you have Depression?', color_discrete_map={'Yes': 'orange', 'No': 'skyblue'},
+            text_auto='.2f', range_y=[3.0, 3.5] 
+        )
+        st.plotly_chart(fig_corr_kaggle, use_container_width=True)
     else:
-        st.error("Lỗi: Không tìm thấy file 'data/Student Mental health.csv'. Vui lòng kiểm tra lại.")
-
-with tab2:
-    # (Giữ nguyên code của Tab 2 vì nó đã hoạt động tốt)
-    st.header("Hệ thống AI Phân tích Cảm xúc (Mô phỏng)")
-    st.markdown("Đây là một hệ thống minh chứng khái niệm (Proof of Concept)...")
+        st.warning("Không có dữ liệu phù hợp với bộ lọc đã chọn.")
     
-    num_risky_students = len(simulation_alerts)
-    st.metric("Số Sinh viên bị AI gắn cờ (từ dữ liệu mô phỏng)", f"{num_risky_students}")
+    st.info("=> **Phát hiện 1:** Phân tích cho thấy có sự khác biệt về GPA giữa các nhóm sinh viên khác nhau.")
 
-    if not simulation_alerts:
-        st.success("Hệ thống AI không phát hiện sinh viên nào vượt ngưỡng cảnh báo...")
-    else:
-        alert_df = pd.DataFrame(simulation_alerts)
-        st.dataframe(alert_df)
+    st.markdown("---")
+
+    st.header("Phần 2: Phân tích Chuyên sâu các Yếu tố Rủi ro (Dữ liệu Tùy chỉnh)")
+    st.markdown("Để hiểu rõ hơn các nguyên nhân tiềm ẩn, chúng ta phân tích bộ dữ liệu hồ sơ sinh viên được mô phỏng chi tiết.")
+    load_order = ['Low', 'Medium', 'High']
+    profiles_df['academic_load'] = pd.Categorical(profiles_df['academic_load'], categories=load_order, ordered=True)
+    avg_stress_grouped = profiles_df.groupby(['academic_load', 'social_support'])['final_stress_level'].mean().reset_index()
     
-    st.info("Lưu ý: Dữ liệu hành vi và hệ thống AI này hoạt động độc lập với dữ liệu khảo sát ở Tab 1.")
+    # === DÒNG CODE ĐÃ ĐƯỢC SỬA LỖI CÚ PHÁP ===
+    fig_corr_custom = px.bar(
+        avg_stress_grouped, 
+        x='academic_load', 
+        y='final_stress_level', 
+        color='social_support', 
+        barmode='group', 
+        title="Mức độ Stress Trung bình theo Áp lực Học tập và Hỗ trợ Xã hội", 
+        labels={"academic_load": "Mức độ Áp lực Học tập", "final_stress_level": "Mức độ Stress Trung bình (0-5)", "social_support": "Hỗ trợ Xã hội"}, 
+        color_discrete_map={'Good': 'green', 'Average': 'blue', 'Poor': 'red'}
+    )
+    st.plotly_chart(fig_corr_custom, use_container_width=True)
+    st.info("=> **Phát hiện 2:** Áp lực học tập càng cao và thiếu sự hỗ trợ từ xã hội, mức độ stress trung bình càng tăng cao.")
+
+    st.markdown("---")
+
+    st.header("Phần 3: Giải pháp - Giám sát Hành vi & Cảnh báo bằng AI")
+    st.markdown("Từ các yếu tố nguy cơ, chúng ta xây dựng hệ thống giám sát các biểu hiện hành vi tương ứng và đưa ra cảnh báo sớm.")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Diễn biến Hành vi Thức khuya")
+        logins_df['timestamp'] = pd.to_datetime(logins_df['timestamp'])
+        logins_df['hour'] = logins_df['timestamp'].dt.hour
+        late_night_logins = logins_df[(logins_df['hour'] >= 0) & (logins_df['hour'] <= 4)]
+        daily_late_logins = late_night_logins.resample('D', on='timestamp').size().rename('Số lượt đăng nhập đêm')
+        fig_timeline = px.line(daily_late_logins, title="Số lượt Đăng nhập Đêm (0h-4h)")
+        st.plotly_chart(fig_timeline, use_container_width=True)
+    with col2:
+        st.subheader("Cảnh báo từ Hệ thống AI")
+        alerts = get_simulation_alerts()
+        st.metric("Số Sinh viên bị AI gắn cờ", len(alerts))
+        if alerts:
+            st.dataframe(pd.DataFrame(alerts).sort_values(by='negative_post_count', ascending=False))
+        else:
+            st.success("Không có cảnh báo mới.")
+    st.info("=> **Kết luận:** Hệ thống có khả năng phát hiện các mẫu hành vi bất thường và tự động cảnh báo các trường hợp có nguy cơ.")
